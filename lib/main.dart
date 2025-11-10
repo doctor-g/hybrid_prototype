@@ -26,6 +26,8 @@ class EncounterView extends StatefulWidget {
 }
 
 class _EncounterViewState extends State<EncounterView> {
+  late bool detected;
+  late Disposition disposition;
   final List<Option> options = [];
 
   @override
@@ -35,12 +37,61 @@ class _EncounterViewState extends State<EncounterView> {
   }
 
   void _randomize() {
-    options
-      ..clear()
-      ..addAll([
-        for (final action in PlayerAction.values)
-          Option(action, Consequence.values.pickRandom()),
+    Consequence anyDangerousConsequence() => [
+      Consequence.timer,
+      Consequence.harm,
+      Consequence.gear,
+      Consequence.heat,
+    ].pickRandom();
+
+    disposition = Disposition.neutral;
+    detected = random.nextDouble() <= 0.5;
+    options.clear();
+
+    if (disposition == Disposition.neutral) {
+      options.addAll([
+        Option(
+          action: PlayerAction.sway,
+          consequence: [
+            Consequence.coin,
+            Consequence.timer,
+            Consequence.heat,
+          ].pickRandom(),
+        ),
+        Option(
+          action: PlayerAction.command,
+          consequence: [
+            Consequence.coin,
+            Consequence.timer,
+            Consequence.heat,
+            Consequence.harm,
+          ].pickRandom(),
+        ),
       ]);
+    } else {
+      throw UnimplementedError(
+        'Only neutral disposition has been coded so far.',
+      );
+    }
+
+    options.addAll([
+      Option(
+        action: PlayerAction.skirmish,
+        consequence: anyDangerousConsequence(),
+      ),
+      Option(
+        action: PlayerAction.prowl,
+        consequence: anyDangerousConsequence(),
+      ),
+    ]);
+    if (!detected) {
+      options.add(
+        Option(
+          action: PlayerAction.hunt,
+          consequence: anyDangerousConsequence(),
+        ),
+      );
+    }
   }
 
   @override
@@ -48,8 +99,9 @@ class _EncounterViewState extends State<EncounterView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final option in options)
-          Text('${option.action.name}: ${option.consequence.name}'),
+        Text('Disposition: ${disposition.name}'),
+        Text(detected ? 'Detected' : 'Undetected'),
+        for (final option in options) Text(option.toString()),
         ElevatedButton(
           onPressed: () => setState(_randomize),
           child: const Text('Randomize'),
@@ -59,23 +111,31 @@ class _EncounterViewState extends State<EncounterView> {
   }
 }
 
+enum Disposition { friendly, neutral, cautious, aggressive }
+
 enum PlayerAction { sway, command, hunt, skirmish, prowl }
 
-enum Consequence { heat, timer, harm, gear }
+enum Consequence { coin, heat, timer, harm, gear }
 
 class Option {
   final PlayerAction action;
+  final int modifier;
   final Consequence consequence;
 
-  Option(this.action, this.consequence);
+  Option({required this.action, required this.consequence, this.modifier = 0});
 
-  factory Option.of(PlayerAction action, List<Consequence> consequences) {
-    return Option(action, consequences.pickRandom());
+  @override
+  String toString() {
+    return '${action.name}${switch (modifier) {
+      < 0 => '$modifier',
+      > 0 => '+$modifier',
+      int() => '',
+    }}: ${consequence.name}';
   }
 }
 
-extension<T> on List<T> {
-  static final _random = Random();
+final random = Random();
 
-  T pickRandom() => this[_random.nextInt(length)];
+extension<T> on List<T> {
+  T pickRandom() => this[random.nextInt(length)];
 }
