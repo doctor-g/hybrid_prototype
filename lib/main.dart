@@ -13,125 +13,119 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Hybrid Prototype',
-      home: Scaffold(body: EncounterView()),
+      home: Scaffold(body: MainView()),
     );
   }
 }
 
-class EncounterView extends StatefulWidget {
-  const EncounterView({super.key});
+class MainView extends StatefulWidget {
+  const MainView({super.key});
 
   @override
-  State<EncounterView> createState() => _EncounterViewState();
+  State<MainView> createState() => _MainViewState();
 }
 
-class _EncounterViewState extends State<EncounterView> {
-  late bool detected;
-  late Disposition disposition;
-  final List<Option> options = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _randomize();
-  }
-
-  void _randomize() {
-    Consequence anyDangerousConsequence() => [
-      Consequence.timer,
-      Consequence.harm,
-      Consequence.gear,
-      Consequence.heat,
-    ].pickRandom();
-
-    disposition = Disposition.neutral;
-    detected = random.nextDouble() <= 0.5;
-    options.clear();
-
-    if (disposition == Disposition.neutral) {
-      options.addAll([
-        Option(
-          action: PlayerAction.sway,
-          consequence: [
-            Consequence.coin,
-            Consequence.timer,
-            Consequence.heat,
-          ].pickRandom(),
-        ),
-        Option(
-          action: PlayerAction.command,
-          consequence: [
-            Consequence.coin,
-            Consequence.timer,
-            Consequence.heat,
-            Consequence.harm,
-          ].pickRandom(),
-        ),
-      ]);
-    } else {
-      throw UnimplementedError(
-        'Only neutral disposition has been coded so far.',
-      );
-    }
-
-    options.addAll([
-      Option(
-        action: PlayerAction.skirmish,
-        consequence: anyDangerousConsequence(),
-      ),
-      Option(
-        action: PlayerAction.prowl,
-        consequence: anyDangerousConsequence(),
-      ),
-    ]);
-    if (!detected) {
-      options.add(
-        Option(
-          action: PlayerAction.hunt,
-          consequence: anyDangerousConsequence(),
-        ),
-      );
-    }
-  }
+class _MainViewState extends State<MainView> {
+  Encounter encounter = _generateEncounter();
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Disposition: ${disposition.name}'),
-        Text(detected ? 'Detected' : 'Undetected'),
-        for (final option in options) Text(option.toString()),
         ElevatedButton(
-          onPressed: () => setState(_randomize),
-          child: const Text('Randomize'),
+          onPressed: () => setState(() {
+            encounter = _generateEncounter();
+          }),
+          child: const Text('Generate Encounter'),
         ),
+        EncounterView(encounter),
+      ],
+    );
+  }
+
+  static Encounter _generateEncounter() {
+    final type = EncounterType.values.pickRandom();
+    return Encounter(type, {
+      for (final action in actionsByEncounterType[type]!)
+        action: Consequence.values.pickRandom(),
+    });
+  }
+}
+
+class EncounterView extends StatelessWidget {
+  final Encounter encounter;
+
+  const EncounterView(this.encounter, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Type: ${encounter.type.name}'),
+        Text('Hearts: ${encounter.hearts}'),
+        const Text('Actions:'),
+        for (final entry in encounter.actions.entries)
+          Text('${entry.key.name}: ${entry.value.name}'),
       ],
     );
   }
 }
 
-enum Disposition { friendly, neutral, cautious, aggressive }
-
-enum PlayerAction { sway, command, hunt, skirmish, prowl }
+enum PlayerAction {
+  sway,
+  fight,
+  command,
+  flee,
+  assess,
+  athletics,
+  scout,
+  tinker,
+}
 
 enum Consequence { coin, heat, timer, harm, gear }
 
+enum EncounterType { npc, obstacle, trap }
+
+const actionsByEncounterType = <EncounterType, List<PlayerAction>>{
+  EncounterType.npc: [
+    PlayerAction.sway,
+    PlayerAction.fight,
+    PlayerAction.command,
+    PlayerAction.flee,
+    PlayerAction.assess,
+  ],
+  EncounterType.obstacle: [
+    PlayerAction.athletics,
+    PlayerAction.scout,
+    PlayerAction.assess,
+  ],
+  EncounterType.trap: [
+    PlayerAction.tinker,
+    PlayerAction.scout,
+    PlayerAction.assess,
+  ],
+};
+
 class Option {
   final PlayerAction action;
-  final int modifier;
   final Consequence consequence;
 
-  Option({required this.action, required this.consequence, this.modifier = 0});
+  Option({required this.action, required this.consequence});
 
   @override
   String toString() {
-    return '${action.name}${switch (modifier) {
-      < 0 => '$modifier',
-      > 0 => '+$modifier',
-      int() => '',
-    }}: ${consequence.name}';
+    return '${action.name}: ${consequence.name}';
   }
+}
+
+class Encounter {
+  final int hearts = 2;
+  final EncounterType type;
+  final Map<PlayerAction, Consequence> actions;
+
+  Encounter(this.type, this.actions);
 }
 
 final random = Random();
